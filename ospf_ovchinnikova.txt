@@ -1,0 +1,96 @@
+R2AR0>enable 
+R2AR0#conf t 
+R2AR0(config)#int loopback 0 
+R2AR0(config-if)#ip address 10.25.0.1 255.255.255.255 
+R2AR0(config-if)#exit 
+
+R2AR0(config)#int loopback 1 
+R2AR0(config-if)#ip address 10.25.1.1 255.255.255.255 
+R2AR0(config-if)#exit 
+
+R2AR0(config)#int loopback 2 
+R2AR0(config-if)#ip address 10.25.2.1 255.255.255.255 
+R2AR0(config-if)#exit 
+
+R2AR0(config)#int loopback 3 
+R2AR0(config-if)#ip address 10.25.3.1 255.255.255.255 
+R2AR0(config-if)#exit
+
+Шаг 7
+
+R2AR0(config)#router rip 
+R2AR0(config-router)#version 2 
+R2AR0(config-router)#network 10.0.0.0 
+R2AR0(config-router)#exit 
+R2AR0(config)#router ospf 1 
+R2AR0(config-router)#redistribute rip subnets
+
+1. В таблице маршрутизации появились записи с кодом «O E2».Что они означают? 
+O – OSPF
+E2 - External Type 2
+Значения метрик не складываются, а используется только метрика объявляемая из внешней сети. Рассчитывается стоимость перехода из одной АС в другую.
+
+2. Объяснить смысл данных выводимых командой show ip ospf database external. 
+Выводится адреса, маски, ID роутера и другая информация о внешних сетях, которые используют другие протоколы маршрутизации.
+
+3. Кто и каким образом генерирует External LSA? Какую информацию содержат External LSA? 
+Маршрутизатор R2AR0 (пограничный) рассылает OSPF пакеты во все возможные области. Они содержат описание внешних маршрутов, которые передаются в OSPF.
+
+
+
+Шаг 8
+
+ABR>enable
+ABR#conf t
+ABR(config)#router ospf 1
+ABR(config-router)#area 1 stub
+
+R1AR1>enable
+R1AR1#conf t
+R1AR1(config)#router ospf 1
+R1AR1(config-router)#area 1 stub
+
+ASBR>enable
+ASBR#conf t
+ASBR(config)#router ospf 1
+ASBR(config-router)#area 1 stub
+
+1.	Что такое тупиковая область? Для чего нужна? 
+Не принимает информацию о внешних маршрутах для АС, но принимает маршруты из других зон.
+Для передачи информации за границу автономной системы используют маршрут по умолчанию.
+Позволяет снизить нагрузку на маршрутизаторы внутри области, из-за расчета меньшего количества маршрутов.
+
+2. Как отразилось на таблице маршрутизации и содержимом топологической базы маршрутизаторов ABR и R1AR1 то, что область стала тупиковой? 
+У роутера R1AR1 пропала вся информация о внешних маршрутах (External LSA), и появился маршрут по умолчанию (Summary LSA)
+
+3. Предположим, что из области Area 1 понадобилось передать в OSPF какой-то внешний маршрут, например, пробросить статический маршрут до провайдера и т.д. В топологии в Area 1 есть роутер ASBR, на котором настроено несколько статических маршрутов. Удаётся ли передать эти маршруты в OSPF? Почему?
+
+
+Шаг 9
+
+ASBR(config)#router ospf 1
+ASBR(config-router)#no area 1 stub
+ASBR(config-router)#area 1 nssa
+
+R1AR1(config)#router ospf 1
+R1AR1(config-router)#no area 1 stub
+R1AR1(config-router)#area 1 nssa
+
+ABR(config)#router ospf 1
+ABR(config-router)#no area 1 stub
+ABR(config-router)#area 1 nssa
+
+ABR#conf t
+ABR(config)#router ospf 1
+ABR(config-router)#area 1 nssa
+ABR(config-router)#default-information originate
+
+ASBR#conf t
+ASBR(config)#router ospf 1
+ASBR(config-router)#redistribute static subnets
+
+3.Как после данной настройки изменились таблицы маршрутизации и содержимое топологической базы маршрутизаторов ABR и R1AR0?
+На маршрутизаторе R1AR1 видны сети, помеченные кодом «N» (NSSA External)
+На маршрутизаторе R1AR0 видны обычные внешние маршруты, и нет NSSA External LSA
+ABR-роутер выполняет конвертацию NSSA External в External и передает их в другие области.
+
